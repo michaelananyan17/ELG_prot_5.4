@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PELE - Personalized English Learning Experience (Functional)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        .app-container {
+            background-color: #ffffff;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            max-width: 4xl;
+            width: 100%;
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+        }
+
+        /* --- Step 1/2 Styling (UPDATED from prot_2) --- */
+        .card-topic, .card-format {
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            user-select: none;
+            border: 3px solid transparent;
+            background-color: #ffffff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            /* Important for absolute positioning of priority number */
+            position: relative; 
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+        .card-topic:hover, .card-format:hover {
+            box-shadow: 0 5px 20px rgba(79, 70, 229, 0.2);
+        }
+        .card-topic.selected, .card-format.selected {
+            border-color: #4f46e5; /* Indigo-600 */
+            background-color: #eef2ff; /* Indigo-50 */
+            box-shadow: 0 5px 20px rgba(79, 70, 229, 0.3);
+        }
+        
+        /* Priority number style for selected topic cards */
+        .priority-number {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            min-width: 24px; 
+            min-height: 24px;
+            background-color: #4f46e5;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        /* --- Step 3 Styling (CEFR Slider) --- */
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4f46e5; /* Indigo-600 */
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            margin-top: -8px; /* Center the thumb vertically */
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Interactive Element Styling - Reworked for tile look */
+        .mc-option {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid #e5e7eb; /* Light grey */
+            display: flex; 
+            align-items: center;
+        }
+        .mc-option:hover {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        
+        /* Visual feedback for user selection BEFORE grading */
+        .mc-option.selected-user {
+            background-color: #e0f2fe; /* Light blue/sky-100 for selected state */
+            border-color: #3b82f6; /* Blue-500 */
+        }
+        /* Custom styling for the letter circle */
+        .mc-option .option-letter {
+            width: 24px;
+            height: 24px;
+            min-width: 24px; /* Fix size */
+            min-height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #4f46e5;
+            border: 2px solid #a5b4fc;
+            background-color: #eef2ff;
+            transition: background-color 0.2s;
+        }
+
+        /* Styling for Correct/Incorrect feedback AFTER grading */
+        .mc-option.selected-correct {
+            background-color: #d1fae5; /* Green 100 */
+            border-color: #10b981; /* Green 500 */
+        }
+        .mc-option.selected-incorrect {
+            background-color: #fee2e2; /* Red 100 */
+            border-color: #ef4444; /* Red 500 */
+        }
+        /* Style for the Correct Answer when user was incorrect (Green highlight) */
+        .mc-option.bg-green-200 { 
+            border-color: #059669 !important; /* Deeper Green */
+        }
+
+        /* --- Step 4/5 Styling (NEW for prot_5) --- */
+        .assignment-card {
+            transition: all 0.3s ease-in-out;
+            border: 2px solid #e5e7eb; /* Gray-200 */
+            border-radius: 0.5rem;
+        }
+        .assignment-card.selected-for-submission {
+            border-color: #4f46e5; /* Indigo-600 */
+            background-color: #f5f3ff; /* Indigo-50 */
+        }
+        .assignment-card:hover {
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="app-container">
+        <div id="header-section" class="mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2 text-center">PELE Assignment Generator</h1>
+            <p class="text-gray-500 text-center">Powered by OpenAI</p>
+        </div>
+
+        <div class="mb-8">
+            <div class="relative pt-1">
+                <div class="flex mb-2 items-center justify-between">
+                    <div class="text-right">
+                        <span id="progress-text" class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-200">
+                            Step 1: Get Started
+                        </span>
+                    </div>
+                </div>
+                <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-indigo-200">
+                    <div id="progress-bar" style="width: 20%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-600 transition-all duration-500"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-1" class="step-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Welcome! Let's Get Set Up.</h2>
+            <div class="p-6 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mb-6">
+                <h3 class="font-bold text-yellow-800 mb-2">Important: OpenAI API Key Required</h3>
+                <p class="text-sm text-yellow-700">To generate *real* assignments, you need an API key for the OpenAI model. Paste your key below.</p>
+            </div>
+
+            <div class="mb-6">
+                <label for="openai-api-key" class="block text-sm font-medium text-gray-700 mb-2">OpenAI API Key</label>
+                <input type="text" id="openai-api-key" placeholder="Paste your API key here (starts with 'sk-...')" 
+                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out">
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="step-1-next" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                    Next: Topic Selection →
+                </button>
+            </div>
+        </div>
+
+
+        <div id="step-2" class="step-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Step 2: Choose Your Topic</h2>
+                <input type="file" id="upload-topic-input" accept=".txt,.pdf" class="hidden">
+                <button id="upload-topic-btn" class="flex items-center px-4 py-2 text-indigo-600 border border-indigo-600 rounded-lg font-semibold hover:bg-indigo-50 transition duration-150 ease-in-out">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload Topic
+                </button>
+            </div>
+
+            <p class="text-gray-600 mb-4">Select **1 or 2 topics**. The order of selection determines the priority for content generation.</p>
+
+            <div class="flex gap-2 mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <input type="text" id="custom-topic-text" placeholder="Search a custom topic or keyword..." 
+                       class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out">
+                <button id="select-custom-topic-btn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                    Select
+                </button>
+            </div>
+            
+            <p id="selected-topics-indicator" class="text-sm font-medium text-gray-700 mb-6">Selected Topics (Priority Order): None</p>
+
+            <div id="topic-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                </div>
+
+
+            <div class="flex justify-between mt-8">
+                <button id="step-2-back" class="px-6 py-3 text-gray-600 border border-gray-400 rounded-lg font-semibold hover:bg-gray-100 transition duration-150 ease-in-out">
+                    ← Back to API Setup
+                </button>
+                <button id="step-2-next" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                    Next: Assignment Type →
+                </button>
+            </div>
+        </div>
+
+        <div id="step-3" class="step-content hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Step 3: Format & Difficulty</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Assignment Format</h3>
+                    <div id="format-cards" class="grid grid-cols-2 gap-4">
+                        </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Difficulty Level (CEFR)</h3>
+                    
+                    <div class="p-6 bg-indigo-50 rounded-lg shadow-inner">
+                        <div class="flex justify-between text-sm font-medium text-indigo-700 mb-4">
+                            <span id="cefr-display" class="text-2xl font-bold">B1</span>
+                            <span id="level-description-short" class="mt-1">Intermediate</span>
+                        </div>
+                        <input type="range" min="1" max="6" value="3" id="cefr-slider" 
+                               class="w-full h-2 bg-indigo-300 rounded-lg appearance-none cursor-pointer slider-thumb">
+                        <div class="flex justify-between text-xs mt-2 text-indigo-700 font-medium">
+                            <span>A1</span>
+                            <span>A2</span>
+                            <span>B1</span>
+                            <span>B2</span>
+                            <span>C1</span>
+                            <span>C2</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <div id="description-toggle-header" class="flex items-center justify-between cursor-pointer p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition">
+                            <span class="font-medium text-gray-700">What does this level mean?</span>
+                            <span id="toggle-icon" class="text-gray-500 transform transition-transform duration-300">▼</span>
+                        </div>
+                        <div id="level-description-full" class="p-4 bg-white border border-t-0 rounded-b-lg text-sm text-gray-600 hidden">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button id="step-3-back" class="px-6 py-3 text-indigo-600 border border-indigo-600 rounded-lg font-semibold hover:bg-indigo-50 transition duration-150 ease-in-out">
+                    Back (Step 2)
+                </button>
+                <button id="step-3-next-generate" class="px-8 py-3 bg-green-600 text-white font-bold rounded-lg shadow-xl hover:bg-green-700 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                    Generate Assignments
+                </button>
+            </div>
+        </div>
+
+        <div id="step-4" class="step-content hidden">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Step 4: Review Assignments</h2>
+            <p class="text-gray-600 mb-6">Here are the assignments generated for you. Select the ones you want to add to your plan.</p>
+            
+            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="select-all-assignments" class="form-checkbox h-5 w-5 text-indigo-600 rounded">
+                    <span class="text-gray-700 font-medium">Select All Assignments</span>
+                </label>
+                <span id="assignment-counter" class="text-sm font-semibold text-indigo-700">0 of 0 Selected</span>
+            </div>
+
+            <div id="generated-assignments-list" class="space-y-4">
+                </div>
+
+            <div class="mt-8 flex justify-between">
+                <button id="step-4-back-to-prev" class="px-6 py-3 border border-gray-300 rounded-lg shadow-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    ← Back to Step 3
+                </button>
+                <button id="submit-assignments" class="px-6 py-3 border border-transparent rounded-lg shadow-sm font-medium text-white bg-indigo-400 cursor-not-allowed" disabled>
+                    Submit Selected Assignments (0)
+                </button>
+            </div>
+        </div>
+
+        <div id="step-5" class="step-content hidden">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Step 5: Submission Confirmation</h2>
+            <p class="text-gray-600 mb-6">Review the final list of assignments you are submitting to your learning plan.</p>
+
+            <div id="final-assignments-list" class="space-y-4">
+                <div class="p-4 bg-gray-100 rounded-lg text-gray-700 italic">No assignments selected for submission.</div>
+            </div>
+
+            <div class="mt-8 flex justify-between">
+                <button id="step-5-back-to-prev" class="px-6 py-3 border border-gray-300 rounded-lg shadow-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    ← Back to Step 4: Review
+                </button>
+                <button id="step-5-confirm-submission" class="px-6 py-3 border border-transparent rounded-lg shadow-sm font-medium text-white bg-green-600 hover:bg-green-700 transition">
+                    Confirm & Finish Submission
+                </button>
+                <button id="step-5-back-to-start" class="hidden px-6 py-3 bg-gray-800 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 transition">
+                    Finish & Restart
+                </button>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        // =====================================================================================================
+        // GLOBAL CONFIGURATION & STATE
+        // =====================================================================================================
+
+        // IMPORTANT: The user must paste their key here
+        let API_KEY = '';
+        
+        // OpenAI Configuration
+        const OPENAI_MODEL = 'gpt-3.5-turbo-1106'; // A model supporting the JSON mode
+        const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+
+        const appState = {
+            currentStep: 1,
+            selectedTopicIds: [], 
+            selectedFormatIds: [],
+            cefrLevel: 'B1',
+            generatedAssignments: [], // Holds the complete, generated assignment objects
+            userAnswers: [], 
+            customTopicText: '',
+            uploadedTopic: null, 
+        };
+        
+        // Dummy data structure to simulate generated assignments (used after Step 3 for the prototype)
+        window.dummyGeneratedAssignments = [
+            { id: 1, title: 'Essay Prompt on AI', level: 'B2', format: 'WritingPrompt', topic: 'AI & ML', status: 'Generated - Ready to Review', selected: false },
+            { id: 2, title: 'Vocabulary Quiz: Quantum Physics', level: 'C1', format: 'VocabularyWords', topic: 'Quantum Physics', status: 'Generated - Ready to Review', selected: false },
+            { id: 3, title: 'Grammar Exercise: Conjunctions', level: 'A2', format: 'GrammarPractice', topic: 'General English', status: 'Generated - Ready to Review', selected: false },
+            { id: 4, title: 'Multiple Choice: Climate Change Facts', level: 'B1', format: 'MultipleChoice', topic: 'Climate Change', status: 'Generated - Ready to Review', selected: false },
+        ];
+        
+        // Initial Topic Data Pool
+        const TOPIC_POOL_DATA = [
+            { id: 1, name: 'AI & ML', icon: '🤖', category: 'Technology' },
+            { id: 2, name: 'Climate Change', icon: '🌍', category: 'Science' },
+            { id: 3, name: 'Quantum Physics', icon: '⚛️', category: 'Science' },
+            { id: 4, name: 'The Roman Empire', icon: '🏛️', category: 'History' },
+            { id: 5, name: 'Shakespeare', icon: '🎭', category: 'Literature' },
+            { id: 6, name: 'Biotechnology', icon: '🧬', category: 'Science' },
+            { id: 7, name: 'Ancient Egypt', icon: '☥', category: 'History' },
+            { id: 8, name: 'Cybersecurity', icon: '🔒', category: 'Technology' },
+            { id: 9, name: 'Poetry Analysis', icon: '📜', category: 'Literature' },
+            { id: 10, name: 'World Wars', icon: '⚔️', category: 'History' },
+            { id: 11, name: 'Space Exploration', icon: '🚀', category: 'Science' },
+            { id: 12, name: 'Philosophy', icon: '🧠', category: 'Literature' },
+            { id: 13, name: 'Renewable Energy', icon: '💡', category: 'Technology' },
+            { id: 14, name: 'Economic History', icon: '💰', category: 'History' }
+        ];
+        
+        let TOPIC_POOL = [...TOPIC_POOL_DATA];
+        
+        const FORMAT_POOL = [
+            { id: 'ft1', name: 'English Text Topic', type: 'WritingPrompt', icon: '📝', description: 'Generates a full prompt for an essay or a short story (Ungraded)' },
+            { id: 'ft2', name: 'Grammar Practice', type: 'GrammarPractice', icon: '🧠', description: 'Generates sentences with blanks for conjunction or syntax practice' },
+            { id: 'ft3', name: 'Vocabulary Words', type: 'VocabularyWords', icon: '📚', description: 'Generates new words with context, requiring students to use them in sentences (Ungraded)' },
+            { id: 'ft4', name: 'Multiple Choice', type: 'MultipleChoice', icon: '✅', description: 'Generates questions with four potential answers, with only one correct answer' },
+        ];
+
+        const CEFR_LEVELS = {
+            'A1': { val: 1, short: 'Beginner', full: 'Can understand and use familiar everyday expressions and very basic phrases.' },
+            'A2': { val: 2, short: 'Elementary', full: 'Can understand sentences and frequently used expressions related to areas of most immediate relevance.' },
+            'B1': { val: 3, short: 'Intermediate', full: 'Can understand the main points of clear standard input on familiar matters regularly encountered in work, school, leisure, etc.' },
+            'B2': { val: 4, short: 'Upper Intermediate', full: 'Can understand the main ideas of complex text on both concrete and abstract topics, including technical discussions in their field of specialization.' },
+            'C1': { val: 5, short: 'Advanced', full: 'Can understand a wide range of demanding, longer texts, and recognize implicit meaning. Can express him/herself fluently and spontaneously.' },
+            'C2': { val: 6, short: 'Proficiency', full: 'Can understand with ease virtually everything heard or read. Can summarize information from different spoken and written sources.' }
+        };
+
+
+        // =====================================================================================================
+        // UTILITY FUNCTIONS & STATE MANAGEMENT
+        // =====================================================================================================
+
+        function getElement(id) {
+            return document.getElementById(id);
+        }
+
+        function showStep(stepNumber) {
+            appState.currentStep = stepNumber;
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            getElement(`step-${stepNumber}`).classList.remove('hidden');
+            updateProgressBar(stepNumber);
+            
+            // Special handling for Step 4/5
+            if (stepNumber === 4) {
+                // Ensure assignments are populated and buttons are updated when entering Step 4
+                populateAssignmentReviewList();
+                updateSubmissionButton();
+            } else if (stepNumber === 5) {
+                // Ensure the correct buttons are visible on initial entry to Step 5
+                getElement('step-5-back-to-prev').classList.remove('hidden');
+                getElement('step-5-confirm-submission').classList.remove('hidden');
+                getElement('step-5-back-to-start').classList.add('hidden');
+                
+                // Populate the final review list based on selections
+                const selectedAssignments = appState.generatedAssignments.filter(a => a.selected);
+                populateFinalAssignmentList(selectedAssignments);
+            }
+        }
+
+        function updateProgressBar(step) {
+            const totalSteps = 5;
+            const percentage = (step / totalSteps) * 100;
+            getElement('progress-bar').style.width = `${percentage}%`;
+            
+            let text = `Step ${step}: `;
+            if (step === 1) text += "Get Started";
+            if (step === 2) text += "Choose Topic";
+            if (step === 3) text += "Format & Difficulty";
+            if (step === 4) text += "Review Assignments";
+            if (step === 5) text += "Final Export";
+
+            getElement('progress-text').textContent = text;
+        }
+        
+        function updateButtonStates() {
+            // Step 1: API Key validation
+            const apiKeyInput = getElement('openai-api-key').value.trim();
+            API_KEY = apiKeyInput; 
+            getElement('step-1-next').disabled = !apiKeyInput;
+
+            // Step 2: Topic validation & Button Label
+            const hasTopic = appState.selectedTopicIds.length > 0;
+            getElement('step-2-next').disabled = !hasTopic;
+            
+            // Custom Topic Search Select button
+            const customTopicInput = getElement('custom-topic-text').value.trim();
+            getElement('select-custom-topic-btn').disabled = !customTopicInput;
+
+            updateTopicSelectionVisuals(); 
+
+            // Step 3: Format validation
+            const hasFormat = appState.selectedFormatIds.length > 0;
+            getElement('step-3-next-generate').disabled = !hasFormat;
+
+            // Step 4 is handled by updateSubmissionButton()
+        }
+
+        function toggleSelection(id, type) {
+            let stateArray;
+            let cardElement;
+
+            if (type === 'topic') {
+                stateArray = appState.selectedTopicIds;
+                cardElement = getElement(`topic-${id}`);
+            } else { // 'format'
+                stateArray = appState.selectedFormatIds;
+                cardElement = getElement(`${type}-${id}`);
+            }
+
+            const index = stateArray.indexOf(id);
+
+            if (index > -1) {
+                // Deselect
+                stateArray.splice(index, 1);
+                cardElement.classList.remove('selected');
+                
+                if (type === 'topic') {
+                    // Remove priority number visual
+                    const priorityNum = cardElement.querySelector('.priority-number');
+                    if (priorityNum) priorityNum.remove();
+                    
+                    // If custom/uploaded, remove from pool
+                    if (typeof id === 'string') {
+                        TOPIC_POOL = TOPIC_POOL.filter(t => t.id !== id);
+                        if (id === 'uploaded') appState.uploadedTopic = null;
+                        renderCards();
+                    }
+                }
+            } else {
+                // Select - Check max limit for topics
+                if (type === 'topic' && stateArray.length >= 2) {
+                    return; 
+                }
+                
+                // Select
+                stateArray.push(id);
+                cardElement.classList.add('selected');
+            }
+
+            updateButtonStates();
+            if (type === 'topic') {
+                renderPriorityNumbers();
+            }
+        }
+
+        function updateTopicSelectionVisuals() {
+            const topicNames = appState.selectedTopicIds.map(id => {
+                const topic = TOPIC_POOL.find(t => t.id === id);
+                return topic ? topic.name : '';
+            }).filter(Boolean);
+
+            const indicatorText = topicNames.length > 0 
+                ? topicNames.map((name, index) => `#${index + 1} <b>${name}</b>`).join(' | ')
+                : 'None';
+
+            getElement('selected-topics-indicator').innerHTML = `Selected Topics (Priority Order): ${indicatorText}`;
+            renderPriorityNumbers();
+        }
+        
+        function renderPriorityNumbers() {
+            // Remove all existing numbers first
+            document.querySelectorAll('.priority-number').forEach(el => el.remove());
+
+            // Add new numbers based on selected order
+            appState.selectedTopicIds.forEach((id, index) => {
+                const cardElement = getElement(`topic-${id}`);
+                if (cardElement) {
+                    const numberEl = document.createElement('div');
+                    numberEl.className = 'priority-number';
+                    numberEl.textContent = index + 1;
+                    cardElement.appendChild(numberEl);
+                }
+            });
+        }
+        
+        function renderCards() {
+            // Render Topic Cards (Step 2)
+            const topicContainer = getElement('topic-cards');
+            topicContainer.innerHTML = '';
+            TOPIC_POOL.forEach(topic => {
+                const isSelected = appState.selectedTopicIds.includes(topic.id);
+                const card = document.createElement('div');
+                card.id = `topic-${topic.id}`;
+                card.className = `card-topic p-4 border rounded-lg shadow-sm flex flex-col items-center text-center ${isSelected ? 'selected' : ''}`;
+                card.innerHTML = `
+                    <span class="text-3xl mb-2">${topic.icon}</span>
+                    <h3 class="font-semibold text-gray-800">${topic.name}</h3>
+                    <p class="text-xs text-gray-500 mt-1">${topic.category}</p>
+                `;
+                card.addEventListener('click', () => toggleSelection(topic.id, 'topic'));
+                topicContainer.appendChild(card);
+            });
+            updateTopicSelectionVisuals(); // Re-apply priority numbers after re-render
+
+            // Render Format Cards (Step 3)
+            const formatContainer = getElement('format-cards');
+            formatContainer.innerHTML = '';
+            FORMAT_POOL.forEach(format => {
+                const isSelected = appState.selectedFormatIds.includes(format.id);
+                const card = document.createElement('div');
+                card.id = `format-${format.id}`;
+                card.className = `card-format p-4 border rounded-lg shadow-sm ${isSelected ? 'selected' : ''}`;
+                card.innerHTML = `
+                    <span class="text-2xl mb-1">${format.icon}</span>
+                    <h3 class="font-semibold text-gray-800">${format.name}</h3>
+                    <p class="text-xs text-gray-500 mt-1">${format.description}</p>
+                `;
+                card.addEventListener('click', () => toggleSelection(format.id, 'format'));
+                formatContainer.appendChild(card);
+            });
+        }
+        
+        function handleCustomTopic() {
+            const topicName = getElement('custom-topic-text').value.trim();
+            if (!topicName) return;
+
+            // Check if max topics are already selected
+            if (appState.selectedTopicIds.length >= 2) {
+                alert("You can only select a maximum of 2 topics.");
+                return;
+            }
+            
+            // Generate a unique ID for the custom topic
+            const newTopicId = `custom-${Date.now()}`;
+            
+            const newTopic = {
+                id: newTopicId,
+                name: topicName,
+                icon: '✍️',
+                category: 'Custom'
+            };
+
+            // Add to pool, select it, and re-render
+            TOPIC_POOL.push(newTopic);
+            toggleSelection(newTopicId, 'topic');
+            
+            // Clear input and disable button
+            getElement('custom-topic-text').value = '';
+            updateButtonStates();
+            
+            // Re-render to show the new card
+            renderCards();
+        }
+
+        function handleUploadTopic(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (appState.selectedTopicIds.length >= 2) {
+                alert("You can only select a maximum of 2 topics.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileContent = e.target.result;
+                const newTopicId = 'uploaded';
+
+                // If an uploaded topic already exists in the pool, remove it first
+                TOPIC_POOL = TOPIC_POOL.filter(t => t.id !== 'uploaded');
+
+                const newTopic = {
+                    id: newTopicId,
+                    name: `File: ${file.name}`,
+                    icon: '📄',
+                    category: 'Uploaded Content',
+                    content: fileContent // Store content for generation
+                };
+                appState.uploadedTopic = newTopic;
+                
+                TOPIC_POOL.push(newTopic);
+                
+                // If it was previously selected, deselect it to ensure clean state before re-selecting
+                if (appState.selectedTopicIds.includes(newTopicId)) {
+                    appState.selectedTopicIds = appState.selectedTopicIds.filter(id => id !== newTopicId);
+                }
+
+                // Select the new uploaded topic
+                toggleSelection(newTopicId, 'topic');
+                
+                // Re-render to show the new card
+                renderCards();
+            };
+            // Read file as text for LLM context
+            reader.readAsText(file);
+        }
+
+        function updateLevel(sliderValue) {
+            // Find the CEFR level by value
+            const levelMap = Object.keys(CEFR_LEVELS).find(key => CEFR_LEVELS[key].val == sliderValue);
+            
+            if (levelMap) {
+                const levelData = CEFR_LEVELS[levelMap];
+                appState.cefrLevel = levelMap;
+                getElement('cefr-display').textContent = levelMap;
+                getElement('level-description-short').textContent = levelData.short;
+                getElement('level-description-full').textContent = levelData.full;
+            }
+        }
+
+        function toggleDescription() {
+            const desc = getElement('level-description-full');
+            const icon = getElement('toggle-icon');
+            const isHidden = desc.classList.contains('hidden');
+            
+            if (isHidden) {
+                desc.classList.remove('hidden');
+                icon.textContent = '▲';
+            } else {
+                desc.classList.add('hidden');
+                icon.textContent = '▼';
+            }
+        }
+        
+        // =====================================================================================================
+        // GENERATION LOGIC (MOCK-UP)
+        // =====================================================================================================
+
+        function startGeneration() {
+            // Placeholder: In a real app, this would perform the LLM API call
+            
+            // Hide Step 3 content, show loading for Step 4
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            getElement('step-4').classList.remove('hidden');
+            
+            // Update progress bar to Step 4
+            updateProgressBar(4);
+
+            getElement('generation-loading').classList.remove('hidden');
+            getElement('assignment-results').classList.add('hidden'); // Hide assignment list during loading
+
+            // Simulate API latency
+            setTimeout(() => {
+                getElement('generation-loading').classList.add('hidden');
+                
+                // In a real scenario, this would be the actual data from the LLM
+                appState.generatedAssignments = window.dummyGeneratedAssignments.map(a => ({...a, selected: true})); // Default to selected for prototype
+                
+                // Show the assignment review list
+                populateAssignmentReviewList();
+                getElement('assignment-results').classList.remove('hidden');
+                updateSubmissionButton();
+                updateSelectAllCheckbox();
+            }, 2000); 
+        }
+        
+        // =====================================================================================================
+        // STEP 4: REVIEW ASSIGNMENTS LOGIC (MODIFIED)
+        // =====================================================================================================
+
+        const populateAssignmentReviewList = () => {
+            const listContainer = getElement('generated-assignments-list');
+            listContainer.innerHTML = ''; // Clear previous list
+
+            if (appState.generatedAssignments.length === 0) {
+                listContainer.innerHTML = '<div class="p-4 bg-yellow-50 rounded-lg text-yellow-700 italic">No assignments were generated. Please go back to Step 3.</div>';
+                return;
+            }
+
+            appState.generatedAssignments.forEach(assignment => {
+                const card = document.createElement('div');
+                // Use the new class 'assignment-card' and optionally 'selected-for-submission'
+                card.className = `assignment-card bg-white rounded-lg p-5 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 ${assignment.selected ? 'selected-for-submission' : ''}`;
+                card.setAttribute('data-assignment-id', assignment.id);
+                
+                // Determine icon and description for the card title/format
+                const formatData = FORMAT_POOL.find(f => f.type === assignment.format) || { icon: '❓', name: 'Unknown Format' };
+                const topicData = TOPIC_POOL.find(t => t.name === assignment.topic) || { icon: '📖' };
+                
+                card.innerHTML = `
+                    <div class="flex items-start space-x-3 w-full sm:w-auto">
+                        <input type="checkbox" class="assignment-select form-checkbox h-5 w-5 text-indigo-600 rounded mt-1" ${assignment.selected ? 'checked' : ''}>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">${topicData.icon} ${assignment.title}</h3>
+                            <p class="text-sm text-gray-500">Level: ${assignment.level} • Format: ${formatData.name}</p>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-2">${assignment.status}</span>
+                        </div>
+                    </div>
+                    <div class="flex space-x-3 mt-3 sm:mt-0">
+                        <button class="view-assignment-btn px-3 py-1 text-sm font-medium rounded-md text-indigo-600 hover:bg-indigo-50 transition">View</button>
+                        <button class="edit-assignment-btn px-3 py-1 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100 transition">Edit</button>
+                        <button class="remove-assignment-btn px-3 py-1 text-sm font-medium rounded-md text-red-600 hover:bg-red-50 transition">Remove</button>
+                    </div>
+                `;
+                
+                // Add event listener for the checkbox
+                card.querySelector('.assignment-select').addEventListener('change', (event) => {
+                    toggleAssignmentSelection(assignment.id, event.target.checked);
+                });
+
+                // Add event listeners for the action buttons (stubbed for prototype)
+                card.querySelector('.view-assignment-btn').addEventListener('click', () => alert(`Viewing the full assignment text for: ${assignment.title}`));
+                card.querySelector('.edit-assignment-btn').addEventListener('click', () => alert(`Opening modal/page to edit: ${assignment.title}`));
+                card.querySelector('.remove-assignment-btn').addEventListener('click', () => removeAssignment(assignment.id));
+                
+                listContainer.appendChild(card);
+            });
+            updateSubmissionButton();
+            updateSelectAllCheckbox();
+        };
+
+        const toggleAssignmentSelection = (id, isSelected) => {
+            const assignment = appState.generatedAssignments.find(a => a.id === id);
+            if (assignment) {
+                assignment.selected = isSelected;
+                
+                // Visual update (toggle class)
+                const card = document.querySelector(`.assignment-card[data-assignment-id="${id}"]`);
+                if (card) {
+                    card.classList.toggle('selected-for-submission', isSelected);
+                }
+                
+                updateSubmissionButton();
+                updateSelectAllCheckbox();
+            }
+        };
+
+        const removeAssignment = (id) => {
+             // Filter the list to remove the assignment
+            appState.generatedAssignments = appState.generatedAssignments.filter(a => a.id !== id);
+            populateAssignmentReviewList(); // Re-render the list
+        };
+
+        const updateSubmissionButton = () => {
+            const selectedCount = appState.generatedAssignments.filter(a => a.selected).length;
+            const button = getElement('submit-assignments');
+            
+            button.textContent = `Submit Selected Assignments (${selectedCount})`;
+            
+            if (selectedCount > 0) {
+                button.classList.remove('bg-indigo-400', 'cursor-not-allowed');
+                button.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                button.disabled = false;
+            } else {
+                button.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                button.classList.add('bg-indigo-400', 'cursor-not-allowed');
+                button.disabled = true;
+            }
+            
+            // Update counter
+            getElement('assignment-counter').textContent = `${selectedCount} of ${appState.generatedAssignments.length} Selected`;
+        };
+        
+        const updateSelectAllCheckbox = () => {
+            const allAssignments = appState.generatedAssignments.length;
+            const selectedAssignments = appState.generatedAssignments.filter(a => a.selected).length;
+            const checkbox = getElement('select-all-assignments');
+            
+            if (allAssignments === 0) {
+                checkbox.checked = false;
+                checkbox.indeterminate = false;
+                checkbox.disabled = true;
+                return;
+            } else {
+                checkbox.disabled = false;
+            }
+
+            if (selectedAssignments === allAssignments) {
+                checkbox.checked = true;
+                checkbox.indeterminate = false;
+            } else if (selectedAssignments > 0) {
+                checkbox.checked = false;
+                checkbox.indeterminate = true;
+            } else {
+                checkbox.checked = false;
+                checkbox.indeterminate = false;
+            }
+        }
+        
+        const toggleSelectAll = (isChecked) => {
+            appState.generatedAssignments.forEach(a => a.selected = isChecked);
+            populateAssignmentReviewList(); // Re-render to update all checkboxes/cards
+        };
+
+        // =====================================================================================================
+        // STEP 5: SUBMISSION CONFIRMATION LOGIC (MODIFIED)
+        // =====================================================================================================
+
+        const submitAssignments = () => {
+            // This function handles transition from Step 4 to Step 5
+            const selectedAssignments = appState.generatedAssignments.filter(a => a.selected);
+            
+            if (selectedAssignments.length > 0) {
+                showStep(5);
+            } else {
+                alert('Please select at least one assignment to submit.');
+            }
+        };
+        
+        const populateFinalAssignmentList = (assignments) => {
+            const listContainer = getElement('final-assignments-list');
+            listContainer.innerHTML = '';
+            
+            if (assignments.length === 0) {
+                listContainer.innerHTML = '<div class="p-4 bg-gray-100 rounded-lg text-gray-700 italic">No assignments selected for submission. Please go back to Step 4 to select.</div>';
+                getElement('step-5-confirm-submission').disabled = true;
+                getElement('step-5-confirm-submission').classList.remove('bg-green-600', 'hover:bg-green-700');
+                getElement('step-5-confirm-submission').classList.add('bg-gray-400', 'cursor-not-allowed');
+                return;
+            }
+            
+            getElement('step-5-confirm-submission').disabled = false;
+            getElement('step-5-confirm-submission').classList.remove('bg-gray-400', 'cursor-not-allowed');
+            getElement('step-5-confirm-submission').classList.add('bg-green-600', 'hover:bg-green-700');
+
+
+            assignments.forEach(assignment => {
+                const formatData = FORMAT_POOL.find(f => f.type === assignment.format) || { icon: '❓', name: 'Unknown Format' };
+                const item = document.createElement('div');
+                item.className = 'p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-md shadow-sm';
+                item.innerHTML = `
+                    <p class="text-md font-semibold text-gray-800">${formatData.icon} ${assignment.title}</p>
+                    <p class="text-sm text-gray-600">Level: ${assignment.level} • Format: ${formatData.name}</p>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+        
+        const confirmSubmission = () => {
+            // Final submission action (e.g., send data to server)
+            alert(`Confirmed submission of ${appState.generatedAssignments.filter(a => a.selected).length} assignments! (Prototype Action)`);
+            
+            // Change Step 5 interface to a success message
+            const step5 = getElement('step-5');
+            step5.querySelector('h2').textContent = 'Step 5: Submission Complete!';
+            step5.querySelector('p').textContent = 'Your selected assignments have been successfully added to your learning plan.';
+            getElement('final-assignments-list').innerHTML = '<div class="p-4 bg-green-100 rounded-lg text-green-800 font-medium text-center">✅ Submission Successful! All assignments have been added to your queue.</div>';
+            
+            // Hide navigation buttons and show the restart button
+            getElement('step-5-back-to-prev').classList.add('hidden');
+            getElement('step-5-confirm-submission').classList.add('hidden');
+            getElement('step-5-back-to-start').classList.remove('hidden'); 
+        }
+
+        // =====================================================================================================
+        // INITIALIZATION
+        // =====================================================================================================
+
+        const init = () => {
+            // Set up Step 1 listeners
+            getElement('openai-api-key').addEventListener('input', updateButtonStates);
+            getElement('step-1-next').addEventListener('click', () => {
+                showStep(2);
+                renderCards();
+            });
+
+            // Set up Step 2 listeners
+            getElement('step-2-back').addEventListener('click', () => showStep(1));
+            getElement('step-2-next').addEventListener('click', () => showStep(3));
+            getElement('custom-topic-text').addEventListener('input', updateButtonStates);
+            getElement('select-custom-topic-btn').addEventListener('click', handleCustomTopic);
+            getElement('upload-topic-btn').addEventListener('click', () => {
+                getElement('upload-topic-input').click();
+            });
+            getElement('upload-topic-input').addEventListener('change', handleUploadTopic);
+
+            // Set up Step 3 listeners
+            const slider = getElement('cefr-slider');
+            slider.addEventListener('input', (event) => updateLevel(event.target.value));
+            getElement('description-toggle-header').addEventListener('click', toggleDescription);
+            getElement('step-3-back').addEventListener('click', () => showStep(2));
+            getElement('step-3-next-generate').addEventListener('click', startGeneration);
+
+            // Set up Step 4 listeners (MODIFIED/NEW)
+            getElement('step-4-back-to-prev').addEventListener('click', () => showStep(3));
+            getElement('submit-assignments').addEventListener('click', submitAssignments); // Handler changed
+            getElement('select-all-assignments').addEventListener('change', (event) => toggleSelectAll(event.target.checked));
+
+            // Set up Step 5 listeners (MODIFIED/NEW)
+            getElement('step-5-back-to-prev').addEventListener('click', () => showStep(4));
+            getElement('step-5-confirm-submission').addEventListener('click', confirmSubmission);
+            getElement('step-5-back-to-start').addEventListener('click', () => {
+                location.reload(); // Simplest way to restart the prototype state
+            });
+
+
+            // Initial state setup
+            updateLevel(slider.value); 
+            showStep(1); // Start at Step 1
+            updateButtonStates(); // Initial check for API Key
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
